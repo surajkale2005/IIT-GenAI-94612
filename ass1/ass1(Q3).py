@@ -1,0 +1,44 @@
+# -*- coding: utf-8 -*-
+"""ass1(Q3).ipynb
+
+
+
+import csv
+
+
+products = []
+with open("/content/products.csv") as f:
+    for row in csv.DictReader(f):
+        products.append(row)
+
+
+for p in products:
+    print(p)
+
+
+print("Total rows:", len(products))
+
+
+above_500 = 0
+for p in products:
+    if float(p["price"]) > 500:
+        above_500 += 1
+print("Above 500:", above_500)
+
+
+total = 0
+for p in products:
+    total += float(p["price"])
+print("Average price:", total / len(products))
+
+
+cat = input("Enter category: ")
+for p in products:
+    if p["category"].lower() == cat.lower():
+        print(p["product_name"])
+
+
+qty = 0
+for p in products:
+    qty += int(p["quantity"])
+print("Total quantity:", qty)
