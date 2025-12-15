@@ -2,3 +2,4 @@ venv_a/
 venv_b/
 venv_c/
 venv_p/
+.env/
