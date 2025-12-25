@@ -12,7 +12,7 @@ load_dotenv.load_dotenv()
 # llm_url = "http://127.0.0.1:1234/v1"
 # llm = ChatOpenAI(
 #     base_url=llm_url,
-#     model="google/gemma-3-4b",
+#     model="phi-3-mini-4k-instruct",
 #     api_key="dummy-key"
 # )
 

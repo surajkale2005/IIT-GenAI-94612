@@ -1,3 +1,11 @@
+import streamlit as st
+import pandas as pd
+from pandasql import sqldf
+import requests
+import json
+import time
+import os
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -5,59 +13,87 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-import time
 
+# -----------------------------
+# Streamlit Page Setup
+# -----------------------------
+st.set_page_config(page_title="Multi-Agent App", layout="wide")
+st.title("🧠 Multi-Agent Intelligent Application")
 
-URL = "https://www.sunbeaminfo.in/internship"
+# -----------------------------
+# Sidebar Agent Selection
+# -----------------------------
+st.sidebar.title("Agent Selection")
+agent_choice = st.sidebar.selectbox(
+    "Choose Agent",
+    ["CSV Question Answering Agent", "Sunbeam Internship Agent"]
+)
 
+# -----------------------------
+# Chat History (SAFE FORMAT)
+# -----------------------------
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-options = Options()
-options.add_argument("--headless=new")
-options.add_argument("--window-size=1920,1080")
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+# -----------------------------
+# Utility: Call LM Studio
+# -----------------------------
+def call_llm(prompt):
+    url = "http://127.0.0.1:1234/v1/chat/completions"
+    headers = {"Content-Type": "application/json"}
 
-driver.get(URL)
-wait = WebDriverWait(driver, 10)
+    data = {
+        "model": "local-model",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant. Explain answers in simple English."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7
+    }
 
-print(f"Page Title: {driver.title}\n")
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+    result = response.json()
+    return result["choices"][0]["message"]["content"]
 
+# =====================================================
+# AGENT 1: CSV QUESTION ANSWERING AGENT
+# =====================================================
+if agent_choice == "CSV Question Answering Agent":
+    st.header("📊 CSV Question Answering Agent")
 
-for panel in ["#collapseOne", "#collapseTwo", "#collapseSix"]:
-    try:
-        elem = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f"a[href='{panel}']")))
-        elem.click()
-        time.sleep(1)  # wait for JS to render content
-    except:
-        print(f"Panel {panel} not found!")
+    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
-print("\n Internship \n")
-try:
-    overview = driver.find_element(By.CSS_SELECTOR, "#collapseOne .panel-body").text
-    print(overview)
-except:
-    print("Overview not found!")
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        st.subheader("📄 CSV Preview")
+        st.dataframe(df)
 
+        st.subheader("📌 CSV Schema")
+        schema_text = "\n".join([f"{col} : {dtype}" for col, dtype in df.dtypes.items()])
+        st.code(schema_text)
 
-print("\n Available Internship Technologies \n")
-try:
-    tech_list = driver.find_elements(By.CSS_SELECTOR, "#collapseTwo li")
-    for tech in tech_list:
-        text = tech.text.strip()
-        if text:
-            print("-", text)
-except:
-    print("Technologies not found!")
+        user_query = st.chat_input("Ask a question about the CSV data")
 
+        if user_query:
+            st.session_state.chat_history.append({"role": "user", "content": user_query})
 
-print("\n Internship Batches \n")
-try:
-    table = driver.find_element(By.CSS_SELECTOR, "#collapseSix table")
-    rows = table.find_elements(By.TAG_NAME, "tr")[1:]  # skip header
-    for row in rows:
-        cols = row.find_elements(By.TAG_NAME, "td")
-        if len(cols) >= 7:
-            print(f"{cols[0].text} | {cols[1].text} | {cols[2].text} | {cols[3].text} | {cols[4].text} | {cols[5].text} | {cols[6].text}")
-except:
-    print("Batches table not found!")
+            try:
+                prompt = f"""
+                CSV Columns:
+                {schema_text}
 
-driver.quit()
+                User Question:
+                {user_query}
+
+                Convert the question into an SQL query for table name df.
+                Only return SQL.
+                """
+
+                sql_query = call_llm(prompt)
+
+                result_df = sqldf(sql_query, {"df": df})
+
+                answer = f"""
+**SQL Used:**
+```sql
+{sql_query}
